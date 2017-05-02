@@ -11,8 +11,10 @@
 #include <map>
 #include <numeric>
 
+#define DEBUG_PREDICTED_LM 0
+#define DEBUG_PREDICTED_OBS 0
 #include "particle_filter.h"
-#define EPSILON 1e-4
+#define EPSILON 1e-3
 
 using namespace std;
 
@@ -142,8 +144,20 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             }
 
         }
-
+        if(DEBUG_PREDICTED_LM){
+            for(int k = 0;k<predicted.size();++k){
+                cout<<"Landmark "<<predicted[k].id<<" x:"<<predicted[k].x<<" y:"<<predicted[k].y<<endl;
+            }
+        }
+     
         dataAssociation(predicted , observations);
+        
+        if(DEBUG_PREDICTED_OBS){
+            for(int k = 0;k<observations.size();++k){
+                cout<<"observation "<<observations[k].id<<" x:"<<observations[k].x<<" y:"<<observations[k].y<<endl;
+            }
+        }
+
         double prob = 1.0;
         double std_x = std_landmark[0];
         double std_y = std_landmark[1];
@@ -159,9 +173,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             double x_lm = lm.x_f;
             double y_lm = lm.y_f;
            
-            double x_diff = pow((x_obs - x_lm)/std_x,2);
-            double y_term = pow((y_obs - y_lm)/std_y,2);
-            prob *= c*exp(-( x_diff + y_term )/2);
+            double x_diff = pow((x_obs - x_lm)/std_x,2.0);
+            double y_diff = pow((y_obs - y_lm)/std_y,2.0);
+            prob *= c*exp(-( x_diff + y_diff )/2);
             
         }
 
