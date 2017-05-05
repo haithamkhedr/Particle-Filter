@@ -10,11 +10,13 @@
 #include <iostream>
 #include <map>
 #include <numeric>
+#include <math.h>
 
 #define DEBUG_PREDICTED_LM 0
 #define DEBUG_PREDICTED_OBS 0
+#define DEBUG_PREDICTION 0
 #include "particle_filter.h"
-#define EPSILON 1e-3
+#define EPSILON 1e-4
 
 using namespace std;
 
@@ -24,14 +26,14 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     // Add random Gaussian noise to each particle.
     // NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
-    num_particles = 500;
+    num_particles = 50;
     default_random_engine gen;
-    normal_distribution<double> xNoise(0,std[0]);
-    normal_distribution<double> yNoise(0,std[1]);
-    normal_distribution<double> yawNoise(0,std[2]);
+    normal_distribution<double> xNoise(x,std[0]);
+    normal_distribution<double> yNoise(y,std[1]);
+    normal_distribution<double> yawNoise(theta,std[2]);
 
     for(int i=0; i < num_particles; ++i){
-        Particle p = {i,x + xNoise(gen),y + yNoise(gen),theta + yawNoise(gen), 1};
+        Particle p = {i,xNoise(gen),yNoise(gen),yawNoise(gen), 1};
         particles.push_back(p);
         weights.push_back(1);
     }
@@ -75,10 +77,23 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
         delta_y += yNoise(gen);
         delta_yaw += yawNoise(gen);
         //Add predcition
+        
+        if(DEBUG_PREDICTION){
+            cout<<"Particle "<<i<<" before prediction ( "<< particles[i].x<<","<<particles[i].y<<","<<particles[i].theta<<")"<<endl;
+            }
+
         particles[i].x += delta_x;
         particles[i].y += delta_y;
         particles[i].theta += delta_yaw;
+        
+        if(DEBUG_PREDICTION){
+            cout<<"Particle "<<i<<" after prediction ( "<< particles[i].x<<","<<particles[i].y<<","<<particles[i].theta<<")"<<endl;
+        }
+
     }
+    
+
+    
 }
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
     // TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
@@ -121,16 +136,20 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     //   for the fact that the map's y-axis actually points downwards.)
     //   http://planning.cs.uiuc.edu/node99.html
     double weights_sum = 0;
+    
     for(int j=0; j < num_particles; ++j){
+        
         Particle p = particles[j];
         std::vector<LandmarkObs> predicted;
         std::map<int,int> lm2idx;
+        std::vector<LandmarkObs> gObservations(observations.size());
+        
         //Map observations from Particle frame to map frame
         for(int i = 0; i < observations.size(); ++i){
             double x = observations[i].x;
             double y = observations[i].y;
-            observations[i].x = x * cos(p.theta) - y * sin(p.theta) + p.x ;
-            observations[i].y = x * sin(p.theta) + y * cos(p.theta) + p.y ;
+            gObservations[i].x = x * cos(p.theta) - y * sin(p.theta) + p.x ;
+            gObservations[i].y = x * sin(p.theta) + y * cos(p.theta) + p.y ;
         }
         for(int k = 0; k < map_landmarks.landmark_list.size(); ++k){
             double x_lm = map_landmarks.landmark_list[k].x_f;
@@ -150,11 +169,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             }
         }
      
-        dataAssociation(predicted , observations);
+        dataAssociation(predicted , gObservations);
         
         if(DEBUG_PREDICTED_OBS){
-            for(int k = 0;k<observations.size();++k){
-                cout<<"observation "<<observations[k].id<<" x:"<<observations[k].x<<" y:"<<observations[k].y<<endl;
+            for(int k = 0;k<gObservations.size();++k){
+                cout<<"observation "<<k<<" associated with landmark "<< gObservations[k].id<<" x:"<<gObservations[k].x<<" y:"<<gObservations[k].y<<endl;
             }
         }
 
@@ -163,8 +182,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
         double std_y = std_landmark[1];
         double c = 1/(2*M_PI * std_x * std_y);
         
-        for(int m=0; m < observations.size(); ++m){
-            LandmarkObs obs = observations[m];
+        for(int m=0; m < gObservations.size(); ++m){
+            LandmarkObs obs = gObservations[m];
             Map::single_landmark_s lm;
             int landmark_id = obs.id; 
             lm = map_landmarks.landmark_list[lm2idx[landmark_id]];
@@ -188,8 +207,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     if(weights_sum > 0){
         for(int i = 0; i < weights.size(); ++i){
             weights[i] /= weights_sum;
-            if(weights[i] > 0)
-                cout<<i<<":"<<weights[i]<<endl;
+//            if(weights[i] > 0)
+//                cout<<i<<":"<<weights[i]<<endl;
         }
     }
 }
